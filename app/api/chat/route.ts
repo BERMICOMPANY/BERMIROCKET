@@ -1,12 +1,13 @@
-import { streamTutorResponse } from "@/lib/groq-ai"
+import { streamText } from "ai"
+import { groq } from "@ai-sdk/groq"
 import { createClient } from "@/lib/supabase/server"
 
 export async function POST(req: Request) {
   try {
-    const { message, sessionId } = await req.json()
+    const { messages, sessionId } = await req.json()
 
-    if (!message) {
-      return new Response("Message is required", { status: 400 })
+    if (!messages || !Array.isArray(messages)) {
+      return new Response("Messages array is required", { status: 400 })
     }
 
     // Get user authentication
@@ -19,35 +20,55 @@ export async function POST(req: Request) {
       return new Response("Unauthorized", { status: 401 })
     }
 
-    // Get conversation history from database
-    let conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = []
+    // Get user profile for context
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, skills, interests")
+      .eq("id", user.id)
+      .single()
 
-    if (sessionId) {
-      const { data: messages } = await supabase
-        .from("ai_chat_messages")
-        .select("role, content")
-        .eq("session_id", sessionId)
-        .order("created_at", { ascending: true })
-        .limit(10) // Last 10 messages for context
+    // Create system message with context
+    const systemMessage = {
+      role: "system" as const,
+      content: `You are the AI Mission Commander for Bermi Rocket, an AI-powered youth empowerment platform. You're helping young entrepreneurs learn about business, AI, and technology.
 
-      if (messages) {
-        conversationHistory = messages.map((msg) => ({
-          role: msg.role as "user" | "assistant",
-          content: msg.content,
-        }))
-      }
+User Context:
+- Name: ${profile?.full_name || "Astronaut"}
+- Skills: ${profile?.skills?.join(", ") || "Learning"}
+- Interests: ${profile?.interests?.join(", ") || "Entrepreneurship"}
+
+Your personality:
+- Encouraging and supportive mentor
+- Use space/rocket terminology occasionally (mission, launch, orbit, etc.)
+- Provide practical, actionable advice
+- Keep responses concise but helpful
+- Focus on entrepreneurship, AI basics, business creation, and personal development
+
+Always be positive, educational, and inspiring while maintaining professionalism.`,
     }
 
-    // Generate streaming response
-    const result = await streamTutorResponse(message, conversationHistory)
+    // Combine system message with conversation
+    const allMessages = [systemMessage, ...messages]
 
-    // Save user message to database
-    if (sessionId) {
-      await supabase.from("ai_chat_messages").insert({
-        session_id: sessionId,
-        role: "user",
-        content: message,
-      })
+    // Generate streaming response
+    const result = await streamText({
+      model: groq("llama-3.1-70b-versatile"),
+      messages: allMessages,
+      temperature: 0.7,
+      maxTokens: 500,
+    })
+
+    // Save user message to database if sessionId provided
+    if (sessionId && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage.role === "user") {
+        await supabase.from("ai_chat_messages").insert({
+          session_id: sessionId,
+          role: "user",
+          content: lastMessage.content,
+          user_id: user.id,
+        })
+      }
     }
 
     // Return streaming response
@@ -59,6 +80,7 @@ export async function POST(req: Request) {
             session_id: sessionId,
             role: "assistant",
             content: completion.text,
+            user_id: user.id,
           })
         }
       },

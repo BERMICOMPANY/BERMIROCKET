@@ -40,53 +40,6 @@ interface NavItem {
   }>
 }
 
-const navItems: NavItem[] = [
-  { id: "launchpad", label: "Mission Control", icon: Home, description: "Dashboard & Overview" },
-  {
-    id: "learning",
-    label: "AI Academy",
-    icon: GraduationCap,
-    description: "Learn & Grow",
-    badge: "3",
-    actions: [
-      { id: "add-course", label: "Add Course", icon: Plus, onClick: () => {} },
-      { id: "start-study", label: "Start Studying", icon: BookOpen, onClick: () => {} },
-    ],
-  },
-  {
-    id: "pesa",
-    label: "PESA Coach",
-    icon: DollarSign,
-    description: "Financial Management",
-    actions: [
-      { id: "add-income", label: "Add Income", icon: TrendingUp, onClick: () => {} },
-      { id: "add-expense", label: "Add Expense", icon: Plus, onClick: () => {} },
-      { id: "add-goal", label: "Add Goal", icon: Target, onClick: () => {} },
-    ],
-  },
-  { id: "business", label: "Business Hub", icon: Briefcase, description: "Tools & Storefronts" },
-  {
-    id: "opportunities",
-    label: "Opportunities",
-    icon: Target,
-    description: "Jobs & Grants",
-    badge: "12",
-    actions: [{ id: "apply", label: "Apply Now", icon: Calendar, onClick: () => {} }],
-  },
-  {
-    id: "community",
-    label: "Crew Network",
-    icon: Users,
-    description: "Connect & Collaborate",
-    actions: [{ id: "message", label: "Send Message", icon: MessageSquare, onClick: () => {} }],
-  },
-]
-
-const bottomNavItems: NavItem[] = [
-  { id: "profile", label: "Profile Settings", icon: Settings, description: "Account & Preferences" },
-  { id: "admin", label: "Admin Panel", icon: Shield, description: "System Control" },
-]
-
 interface DesktopSidebarProps {
   activeSection: string
   onSectionChange: (section: string) => void
@@ -116,6 +69,53 @@ export function DesktopSidebar({
 }: DesktopSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
+  const navItems: NavItem[] = [
+    { id: "launchpad", label: "Mission Control", icon: Home, description: "Dashboard & Overview" },
+    {
+      id: "learning",
+      label: "AI Academy",
+      icon: GraduationCap,
+      description: "Learn & Grow",
+      badge: "3",
+      actions: [
+        { id: "add-course", label: "Add Course", icon: Plus, onClick: () => onAddCourse?.() },
+        { id: "start-study", label: "Start Studying", icon: BookOpen, onClick: () => onStartStudying?.() },
+      ],
+    },
+    {
+      id: "pesa",
+      label: "PESA Coach",
+      icon: DollarSign,
+      description: "Financial Management",
+      actions: [
+        { id: "add-income", label: "Add Income", icon: TrendingUp, onClick: () => onAddIncome?.() },
+        { id: "add-expense", label: "Add Expense", icon: Plus, onClick: () => onAddExpense?.() },
+        { id: "add-goal", label: "Add Goal", icon: Target, onClick: () => onAddGoal?.() },
+      ],
+    },
+    { id: "business", label: "Business Hub", icon: Briefcase, description: "Tools & Storefronts" },
+    {
+      id: "opportunities",
+      label: "Opportunities",
+      icon: Target,
+      description: "Jobs & Grants",
+      badge: "12",
+      actions: [{ id: "apply", label: "Apply Now", icon: Calendar, onClick: () => onApplyOpportunity?.() }],
+    },
+    {
+      id: "community",
+      label: "Crew Network",
+      icon: Users,
+      description: "Connect & Collaborate",
+      actions: [{ id: "message", label: "Send Message", icon: MessageSquare, onClick: () => {} }],
+    },
+  ]
+
+  const bottomNavItems: NavItem[] = [
+    { id: "profile", label: "Profile Settings", icon: Settings, description: "Account & Preferences" },
+    { id: "admin", label: "Admin Panel", icon: Shield, description: "System Control" },
+  ]
+
   const handleSignOut = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
@@ -131,7 +131,7 @@ export function DesktopSidebar({
       }`}
     >
       <div className="flex flex-col h-full">
-        {/* User Profile Header */}
+        {/* User Profile Header - Removed logo, made account prominent */}
         <div className="p-4 border-b border-border bg-gradient-to-r from-primary/5 to-accent/5">
           <div className="flex items-center justify-between">
             {!isCollapsed && (
@@ -161,31 +161,6 @@ export function DesktopSidebar({
             </Button>
           </div>
         </div>
-
-        {/* Quick Actions */}
-        {!isCollapsed && (
-          <div className="p-3 border-b border-border bg-muted/30">
-            <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Quick Actions</p>
-            <div className="grid grid-cols-2 gap-2">
-              <Button size="sm" variant="outline" onClick={onAddGoal} className="h-8 text-xs bg-transparent">
-                <Target className="h-3 w-3 mr-1" />
-                Add Goal
-              </Button>
-              <Button size="sm" variant="outline" onClick={onAddIncome} className="h-8 text-xs bg-transparent">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                Add Income
-              </Button>
-              <Button size="sm" variant="outline" onClick={onStartStudying} className="h-8 text-xs bg-transparent">
-                <BookOpen className="h-3 w-3 mr-1" />
-                Study
-              </Button>
-              <Button size="sm" variant="outline" onClick={onApplyOpportunity} className="h-8 text-xs bg-transparent">
-                <Calendar className="h-3 w-3 mr-1" />
-                Apply
-              </Button>
-            </div>
-          </div>
-        )}
 
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto py-4">

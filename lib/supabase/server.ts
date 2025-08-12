@@ -2,10 +2,9 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { cache } from "react"
 
-// Updated Supabase configuration with your correct credentials
-const SUPABASE_URL = "https://pqkgodnxpiiuvwuortnh.supabase.co"
+const SUPABASE_URL = "https://wumfnurgowmiezckfpkv.supabase.co"
 const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxa2dvZG54cGlpdXZ3dW9ydG5oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2NjI0MDAsImV4cCI6MjA1MTIzODQwMH0.example"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1bWZudXJnb3dtaWV6Y2tmcGt2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMjYzNDQsImV4cCI6MjA3MDYwMjM0NH0.RWcxpQ4-6xouj9dest_pYiSk4Q7BH0uXIrX3ocKts9s"
 
 export const isSupabaseConfigured = true
 

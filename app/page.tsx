@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { DesktopSidebar } from "@/components/desktop-sidebar"
+import { FunctionalModals } from "@/components/functional-modals"
 import { RocketLogo } from "@/components/rocket-logo"
 import { AITutorChat } from "@/components/ai-tutor-chat"
 import { LearningModules } from "@/components/learning-modules"
@@ -42,6 +43,20 @@ export default function HomePage() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [stats, setStats] = useState({
+    learningProgress: 0,
+    savingsAmount: 0,
+    savingsProgress: 0,
+    activeProjects: 0,
+    networkSize: 0,
+  })
+
+  const [showAddGoal, setShowAddGoal] = useState(false)
+  const [showAddIncome, setShowAddIncome] = useState(false)
+  const [showAddExpense, setShowAddExpense] = useState(false)
+  const [showAddCourse, setShowAddCourse] = useState(false)
+  const [showApply, setShowApply] = useState(false)
+  const [showStudy, setShowStudy] = useState(false)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -61,6 +76,8 @@ export default function HomePage() {
         const profileData = await getProfile()
         setProfile(profileData)
         setIsAdmin(profileData?.role === "admin")
+
+        await loadUserStats(session.user.id)
       } catch (error) {
         console.error("Error loading profile:", error)
       }
@@ -70,6 +87,66 @@ export default function HomePage() {
 
     checkAuth()
   }, [])
+
+  const loadUserStats = async (userId: string) => {
+    const supabase = createClient()
+
+    try {
+      // Get learning progress
+      const { data: courses } = await supabase.from("user_courses").select("progress").eq("user_id", userId)
+
+      const avgProgress = courses?.length
+        ? courses.reduce((sum, course) => sum + (course.progress || 0), 0) / courses.length
+        : 0
+
+      // Get financial data
+      const { data: transactions } = await supabase.from("transactions").select("type, amount").eq("user_id", userId)
+
+      const income = transactions?.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0) || 0
+      const expenses = transactions?.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0) || 0
+      const savings = income - expenses
+
+      // Get goals
+      const { data: goals } = await supabase
+        .from("financial_goals")
+        .select("target_amount, current_amount")
+        .eq("user_id", userId)
+        .eq("status", "active")
+
+      const totalGoalAmount = goals?.reduce((sum, goal) => sum + goal.target_amount, 0) || 1
+      const totalCurrentAmount = goals?.reduce((sum, goal) => sum + (goal.current_amount || 0), 0) || 0
+      const goalsProgress = (totalCurrentAmount / totalGoalAmount) * 100
+
+      // Get business projects
+      const { data: businesses } = await supabase.from("businesses").select("id").eq("user_id", userId)
+
+      // Get network size
+      const { data: connections } = await supabase.from("user_connections").select("id").eq("user_id", userId)
+
+      setStats({
+        learningProgress: Math.round(avgProgress),
+        savingsAmount: Math.round(savings),
+        savingsProgress: Math.min(Math.round(goalsProgress), 100),
+        activeProjects: businesses?.length || 0,
+        networkSize: connections?.length || 0,
+      })
+    } catch (error) {
+      console.error("Error loading stats:", error)
+    }
+  }
+
+  const handleAddGoal = () => setShowAddGoal(true)
+  const handleAddIncome = () => setShowAddIncome(true)
+  const handleAddExpense = () => setShowAddExpense(true)
+  const handleAddCourse = () => setShowAddCourse(true)
+  const handleApplyOpportunity = () => setShowApply(true)
+  const handleStartStudying = () => setShowStudy(true)
+
+  const handleDataUpdate = () => {
+    if (user?.id) {
+      loadUserStats(user.id)
+    }
+  }
 
   if (isLoading) {
     return <SplashScreen onComplete={() => setIsLoading(false)} />
@@ -99,12 +176,12 @@ export default function HomePage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Learning Progress</p>
-                <p className="text-2xl font-bold">75%</p>
+                <p className="text-2xl font-bold">{stats.learningProgress}%</p>
               </div>
               <GraduationCap className="h-8 w-8 text-primary" />
             </div>
             <div className="mt-4">
-              <Progress value={75} className="h-2" />
+              <Progress value={stats.learningProgress} className="h-2" />
             </div>
           </CardContent>
         </Card>
@@ -113,13 +190,15 @@ export default function HomePage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Savings Goal</p>
-                <p className="text-2xl font-bold">{profile?.currency || "USD"} 1,250</p>
+                <p className="text-sm font-medium text-muted-foreground">Savings</p>
+                <p className="text-2xl font-bold">
+                  {profile?.currency || "USD"} {stats.savingsAmount}
+                </p>
               </div>
               <DollarSign className="h-8 w-8 text-green-600" />
             </div>
             <div className="mt-4">
-              <Progress value={62} className="h-2" />
+              <Progress value={stats.savingsProgress} className="h-2" />
             </div>
           </CardContent>
         </Card>
@@ -129,12 +208,14 @@ export default function HomePage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Active Projects</p>
-                <p className="text-2xl font-bold">3</p>
+                <p className="text-2xl font-bold">{stats.activeProjects}</p>
               </div>
               <Briefcase className="h-8 w-8 text-blue-600" />
             </div>
             <div className="mt-4">
-              <Badge variant="secondary">2 In Progress</Badge>
+              <Badge variant="secondary">
+                {stats.activeProjects > 0 ? `${stats.activeProjects} Active` : "Start Your First"}
+              </Badge>
             </div>
           </CardContent>
         </Card>
@@ -144,12 +225,12 @@ export default function HomePage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Network</p>
-                <p className="text-2xl font-bold">47</p>
+                <p className="text-2xl font-bold">{stats.networkSize}</p>
               </div>
               <Users className="h-8 w-8 text-purple-600" />
             </div>
             <div className="mt-4">
-              <Badge variant="outline">+5 This Week</Badge>
+              <Badge variant="outline">{stats.networkSize > 0 ? "Growing" : "Start Connecting"}</Badge>
             </div>
           </CardContent>
         </Card>
@@ -399,8 +480,17 @@ export default function HomePage() {
         showAdmin={isAdmin}
         user={user}
         profile={profile}
+        onAddGoal={handleAddGoal}
+        onAddCourse={handleAddCourse}
+        onAddIncome={handleAddIncome}
+        onAddExpense={handleAddExpense}
+        onApplyOpportunity={handleApplyOpportunity}
+        onStartStudying={handleStartStudying}
       />
-      <main className="ml-64 transition-all duration-300">
+
+      <FunctionalModals user={user} profile={profile} onDataUpdate={handleDataUpdate} />
+
+      <main className="ml-72 transition-all duration-300">
         <div className="p-6">{renderContent()}</div>
       </main>
     </div>

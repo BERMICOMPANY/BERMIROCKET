@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { Button } from "@/components/ui/button"
-import { Home, GraduationCap, DollarSign, Briefcase, Users, Target, Settings } from "lucide-react"
+import { Home, GraduationCap, DollarSign, Briefcase, Users, Target, Settings, Shield } from "lucide-react"
 
 interface NavItem {
   id: string
@@ -19,18 +19,22 @@ const navItems: NavItem[] = [
   { id: "opportunities", label: "Opportunities", icon: Target, description: "Jobs & Grants" },
   { id: "community", label: "Crew Hub", icon: Users, description: "Connect & Collaborate" },
   { id: "profile", label: "Profile", icon: Settings, description: "Mission Settings" },
+  { id: "admin", label: "Admin", icon: Shield, description: "Control Center" },
 ]
 
 interface MissionControlNavProps {
   activeSection: string
   onSectionChange: (section: string) => void
+  showAdmin?: boolean
 }
 
-export function MissionControlNav({ activeSection, onSectionChange }: MissionControlNavProps) {
+export function MissionControlNav({ activeSection, onSectionChange, showAdmin = false }: MissionControlNavProps) {
+  const displayItems = showAdmin ? navItems : navItems.filter((item) => item.id !== "admin")
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50">
       <div className="flex justify-around items-center px-1 py-2 overflow-x-auto">
-        {navItems.map((item) => {
+        {displayItems.map((item) => {
           const Icon = item.icon
           const isActive = activeSection === item.id
 

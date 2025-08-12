@@ -16,6 +16,7 @@ import { BusinessStorefronts } from "@/components/business-storefronts"
 import { CrewHub } from "@/components/crew-hub"
 import { ProfileSettings } from "@/components/profile-settings"
 import { AIInsightsCard } from "@/components/ai-insights-card"
+import AdminDashboard from "@/components/admin-dashboard"
 import SplashScreen from "@/components/splash-screen"
 import { createClient } from "@/lib/supabase/client"
 import { getProfile } from "@/lib/profile-actions"
@@ -38,6 +39,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -56,6 +58,8 @@ export default function HomePage() {
       try {
         const profileData = await getProfile()
         setProfile(profileData)
+
+        setIsAdmin(profileData?.role === "admin")
       } catch (error) {
         console.error("Error loading profile:", error)
       }
@@ -250,6 +254,8 @@ export default function HomePage() {
         return <CrewHub />
       case "profile":
         return <ProfileSettings initialProfile={profile} />
+      case "admin":
+        return isAdmin ? <AdminDashboard /> : renderLaunchpad()
       default:
         return renderLaunchpad()
     }
@@ -259,7 +265,7 @@ export default function HomePage() {
     <main className="min-h-screen bg-background">
       <RealtimeNotifications />
       {renderContent()}
-      <MissionControlNav activeSection={activeSection} onSectionChange={setActiveSection} />
+      <MissionControlNav activeSection={activeSection} onSectionChange={setActiveSection} showAdmin={isAdmin} />
     </main>
   )
 }

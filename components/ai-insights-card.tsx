@@ -4,8 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Sparkles, TrendingUp, Target, Lightbulb, RefreshCw } from "lucide-react"
-import { generateFinancialInsights, generateLearningPath } from "@/lib/groq-ai"
+import { Sparkles, TrendingUp, Target, Lightbulb, RefreshCw } from 'lucide-react'
 
 interface AIInsightsCardProps {
   type: "financial" | "learning" | "business"
@@ -25,14 +24,24 @@ export function AIInsightsCard({ type, userData, className }: AIInsightsCardProp
 
       switch (type) {
         case "financial":
-          result = await generateFinancialInsights(userData)
+          const financialResponse = await fetch("/api/insights/financial", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          })
+          if (financialResponse.ok) {
+            const data = await financialResponse.json()
+            result = data.insights
+          }
           break
         case "learning":
-          result = await generateLearningPath(
-            userData?.goals || "Become a successful entrepreneur",
-            userData?.skills || [],
-            userData?.interests || [],
-          )
+          const learningResponse = await fetch("/api/insights/learning", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          })
+          if (learningResponse.ok) {
+            const data = await learningResponse.json()
+            result = data.learningPath
+          }
           break
         case "business":
           result = "Business insights coming soon..."

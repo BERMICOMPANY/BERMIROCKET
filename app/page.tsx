@@ -19,6 +19,7 @@ import { AIInsightsCard } from "@/components/ai-insights-card"
 import SplashScreen from "@/components/splash-screen"
 import { createClient } from "@/lib/supabase/client"
 import { getProfile } from "@/lib/profile-actions"
+import { RealtimeNotifications } from "@/components/realtime-notifications"
 import {
   Target,
   Users,
@@ -256,6 +257,7 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-background">
+      <RealtimeNotifications />
       {renderContent()}
       <MissionControlNav activeSection={activeSection} onSectionChange={setActiveSection} />
     </main>

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useRealtime } from "@/hooks/use-realtime"
 import {
   Users,
   MessageCircle,
@@ -29,8 +30,7 @@ import {
 
 export function CrewHub() {
   const [activeTab, setActiveTab] = useState("community")
-
-  const forumPosts = [
+  const [forumPosts, setForumPosts] = useState([
     {
       id: 1,
       title: "How to validate your business idea before investing?",
@@ -67,7 +67,17 @@ export function CrewHub() {
       excerpt: "Want to share my journey building a social media management tool...",
       featured: true,
     },
-  ]
+  ])
+
+  useRealtime({
+    table: "community_posts",
+    onInsert: (newPost) => {
+      setForumPosts((prev) => [newPost, ...prev])
+    },
+    onUpdate: (updatedPost) => {
+      setForumPosts((prev) => prev.map((post) => (post.id === updatedPost.id ? updatedPost : post)))
+    },
+  })
 
   const peerTeachers = [
     {

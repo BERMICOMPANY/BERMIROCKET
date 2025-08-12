@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,8 +10,14 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Send, Bot, User, Sparkles, Rocket, Zap } from "lucide-react"
-import { useChat } from "ai/react"
 import { createClient } from "@/lib/supabase/client"
+
+interface ChatMessage {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  createdAt: Date
+}
 
 interface ChatSession {
   id: string
@@ -20,21 +28,102 @@ interface ChatSession {
 export function AITutorChat() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [input, setInput] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
-    api: "/api/chat",
-    body: { sessionId },
-    onFinish: () => {
-      // Scroll to bottom after AI response
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!input.trim() || isLoading) return
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: "user",
+      content: input.trim(),
+      createdAt: new Date(),
+    }
+
+    setMessages((prev) => [...prev, userMessage])
+    setInput("")
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: [...messages, userMessage].map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          sessionId,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to get response")
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error("No response body")
+
+      const assistantMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "",
+        createdAt: new Date(),
+      }
+
+      setMessages((prev) => [...prev, assistantMessage])
+
+      // Read streaming response
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = new TextDecoder().decode(value)
+        const lines = chunk.split("\n")
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              if (data.content) {
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMessage.id ? { ...msg, content: msg.content + data.content } : msg,
+                  ),
+                )
+              }
+            } catch (e) {
+              // Ignore parsing errors for incomplete chunks
+            }
+          }
+        }
+      }
+    } catch (err) {
+      setError("Failed to send message. Please try again.")
+      console.error("Chat error:", err)
+    } finally {
+      setIsLoading(false)
+      // Scroll to bottom after response
       setTimeout(() => {
         if (scrollAreaRef.current) {
           scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
         }
       }, 100)
-    },
-  })
+    }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value)
+  }
 
   // Create new chat session
   const createNewSession = async () => {
@@ -56,6 +145,7 @@ export function AITutorChat() {
       if (error) throw error
 
       setSessionId(data.id)
+      setMessages([]) // Clear messages for new session
       loadSessions()
     } catch (error) {
       console.error("Error creating session:", error)
@@ -106,6 +196,10 @@ export function AITutorChat() {
     "What are the best funding options?",
     "How to build a minimum viable product?",
   ]
+
+  const handleQuickPrompt = (prompt: string) => {
+    setInput(prompt)
+  }
 
   return (
     <div className="space-y-4">
@@ -170,8 +264,7 @@ export function AITutorChat() {
                           variant="outline"
                           size="sm"
                           className="text-xs bg-transparent"
-                          onClick={() => handleSubmit(new Event("submit") as any, { data: new FormData() })}
-                          onMouseDown={() => handleInputChange({ target: { value: prompt } } as any)}
+                          onClick={() => handleQuickPrompt(prompt)}
                         >
                           {prompt}
                         </Button>
@@ -199,9 +292,7 @@ export function AITutorChat() {
                     }`}
                   >
                     <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    <div className="text-xs opacity-70 mt-1">
-                      {new Date(message.createdAt || Date.now()).toLocaleTimeString()}
-                    </div>
+                    <div className="text-xs opacity-70 mt-1">{message.createdAt.toLocaleTimeString()}</div>
                   </div>
                   {message.role === "user" && (
                     <Avatar className="h-8 w-8">
@@ -238,7 +329,7 @@ export function AITutorChat() {
 
               {error && (
                 <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg">
-                  <p className="text-sm">Connection error. Please try again.</p>
+                  <p className="text-sm">{error}</p>
                 </div>
               )}
             </div>
@@ -253,9 +344,7 @@ export function AITutorChat() {
                   variant="ghost"
                   size="sm"
                   className="text-xs whitespace-nowrap"
-                  onClick={() => {
-                    handleInputChange({ target: { value: prompt } } as any)
-                  }}
+                  onClick={() => handleQuickPrompt(prompt)}
                 >
                   {prompt}
                 </Button>

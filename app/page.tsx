@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { MissionControlNav } from "@/components/mission-control-nav"
 import { RocketLogo } from "@/components/rocket-logo"
 import { AITutorChat } from "@/components/ai-tutor-chat"
@@ -13,20 +13,80 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PESACoachDashboard } from "@/components/pesa-coach-dashboard"
 import { OpportunityDesk } from "@/components/opportunity-desk"
 import { BusinessStorefronts } from "@/components/business-storefronts"
-// Added CrewHub import for community features
 import { CrewHub } from "@/components/crew-hub"
-import { Target, Users, BookOpen, DollarSign, Briefcase, Award, Bot, FileText, GraduationCap } from "lucide-react"
+import { ProfileSettings } from "@/components/profile-settings"
+import { AIInsightsCard } from "@/components/ai-insights-card"
+import SplashScreen from "@/components/splash-screen"
+import { createClient } from "@/lib/supabase/client"
+import { getProfile } from "@/lib/profile-actions"
+import {
+  Target,
+  Users,
+  BookOpen,
+  DollarSign,
+  Briefcase,
+  Award,
+  Bot,
+  FileText,
+  GraduationCap,
+  Sparkles,
+} from "lucide-react"
 
 export default function HomePage() {
   const [activeSection, setActiveSection] = useState("launchpad")
+  const [isLoading, setIsLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session) {
+        window.location.href = "/auth/login"
+        return
+      }
+
+      setUser(session.user)
+
+      try {
+        const profileData = await getProfile()
+        setProfile(profileData)
+      } catch (error) {
+        console.error("Error loading profile:", error)
+      }
+
+      setIsLoading(false)
+    }
+
+    checkAuth()
+  }, [])
+
+  if (isLoading) {
+    return <SplashScreen onComplete={() => setIsLoading(false)} />
+  }
 
   const renderLaunchpad = () => (
     <div className="space-y-6 pb-20">
-      {/* Header */}
       <div className="text-center py-8 bg-gradient-to-b from-primary/5 to-transparent">
         <RocketLogo size="lg" animated className="justify-center mb-4" />
         <h1 className="text-2xl font-bold text-foreground mb-2">Ready for your next mission?</h1>
         <p className="text-muted-foreground">Your launchpad to entrepreneurial success</p>
+      </div>
+
+      {/* AI Insights Section */}
+      <div className="mx-4 space-y-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-accent" />
+          <h2 className="text-lg font-semibold">AI Mission Insights</h2>
+        </div>
+        <div className="grid gap-4">
+          <AIInsightsCard type="financial" userData={profile} className="border-green-200 dark:border-green-800" />
+          <AIInsightsCard type="learning" userData={profile} className="border-blue-200 dark:border-blue-800" />
+        </div>
       </div>
 
       {/* Mission Progress */}
@@ -98,6 +158,18 @@ export default function HomePage() {
               <Users className="h-8 w-8 text-accent mx-auto mb-2" />
               <h3 className="font-medium">Crew Hub</h3>
               <p className="text-sm text-muted-foreground">Connect & learn</p>
+            </CardContent>
+          </Card>
+
+          {/* Added Profile Settings card */}
+          <Card
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setActiveSection("profile")}
+          >
+            <CardContent className="p-4 text-center">
+              <GraduationCap className="h-8 w-8 text-primary mx-auto mb-2" />
+              <h3 className="font-medium">Profile Settings</h3>
+              <p className="text-sm text-muted-foreground">Manage your profile</p>
             </CardContent>
           </Card>
         </div>
@@ -173,9 +245,10 @@ export default function HomePage() {
         return <BusinessStorefronts />
       case "opportunities":
         return <OpportunityDesk />
-      // Updated community section to render CrewHub component
       case "community":
         return <CrewHub />
+      case "profile":
+        return <ProfileSettings initialProfile={profile} />
       default:
         return renderLaunchpad()
     }

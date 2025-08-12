@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { Button } from "@/components/ui/button"
-import { Home, GraduationCap, DollarSign, Briefcase, Users, Target } from "lucide-react"
+import { Home, GraduationCap, DollarSign, Briefcase, Users, Target, Settings } from "lucide-react"
 
 interface NavItem {
   id: string
@@ -18,6 +18,7 @@ const navItems: NavItem[] = [
   { id: "business", label: "Business", icon: Briefcase, description: "Tools & Storefronts" },
   { id: "opportunities", label: "Opportunities", icon: Target, description: "Jobs & Grants" },
   { id: "community", label: "Crew Hub", icon: Users, description: "Connect & Collaborate" },
+  { id: "profile", label: "Profile", icon: Settings, description: "Mission Settings" },
 ]
 
 interface MissionControlNavProps {
@@ -28,7 +29,7 @@ interface MissionControlNavProps {
 export function MissionControlNav({ activeSection, onSectionChange }: MissionControlNavProps) {
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50">
-      <div className="flex justify-around items-center px-2 py-2">
+      <div className="flex justify-around items-center px-1 py-2 overflow-x-auto">
         {navItems.map((item) => {
           const Icon = item.icon
           const isActive = activeSection === item.id
@@ -39,14 +40,14 @@ export function MissionControlNav({ activeSection, onSectionChange }: MissionCon
               variant={isActive ? "default" : "ghost"}
               size="sm"
               onClick={() => onSectionChange(item.id)}
-              className={`flex flex-col items-center gap-1 h-auto py-2 px-3 rounded-full transition-all duration-200 ${
+              className={`flex flex-col items-center gap-1 h-auto py-2 px-2 rounded-full transition-all duration-200 min-w-0 ${
                 isActive
                   ? "bg-primary text-primary-foreground shadow-lg scale-105"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent"
               }`}
             >
-              <Icon className={`h-5 w-5 ${isActive ? "rocket-launch" : ""}`} />
-              <span className="text-xs font-medium">{item.label}</span>
+              <Icon className={`h-4 w-4 ${isActive ? "rocket-launch" : ""}`} />
+              <span className="text-xs font-medium truncate">{item.label}</span>
             </Button>
           )
         })}

@@ -29,31 +29,8 @@ export async function signIn(prevState: any, formData: FormData) {
     }
 
     if (data.user) {
-      // Check if user has a profile, create one if not
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", data.user.id)
-        .single()
-
-      if (profileError && profileError.code === "PGRST116") {
-        // Profile doesn't exist, create one
-        const { error: createError } = await supabase.from("profiles").insert({
-          id: data.user.id,
-          email: data.user.email,
-          full_name: data.user.user_metadata?.full_name || "",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-
-        if (createError) {
-          console.error("Profile creation error:", createError)
-          return { error: "Failed to create user profile" }
-        }
-      }
+      redirect("/")
     }
-
-    redirect("/")
   } catch (error) {
     console.error("Login error:", error)
     return { error: "An unexpected error occurred. Please try again." }
@@ -92,23 +69,7 @@ export async function signUp(prevState: any, formData: FormData) {
       return { error: error.message }
     }
 
-    if (data.user) {
-      // Create profile immediately after signup
-      const { error: profileError } = await supabase.from("profiles").insert({
-        id: data.user.id,
-        email: data.user.email,
-        full_name: fullName?.toString() || "",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-
-      if (profileError) {
-        console.error("Profile creation error:", profileError)
-        return { error: "Database error saving new user" }
-      }
-    }
-
-    return { success: "Account created successfully! You can now sign in." }
+    return { success: "Account created successfully! Please check your email to confirm your account." }
   } catch (error) {
     console.error("Sign up error:", error)
     return { error: "An unexpected error occurred. Please try again." }

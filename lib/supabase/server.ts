@@ -2,28 +2,18 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { cache } from "react"
 
-// Check if Supabase environment variables are available
-export const isSupabaseConfigured =
-  typeof process.env.NEXT_PUBLIcSUPABASE_URL === "string" &&
-  process.env.NEXT_PUBLIcSUPABASE_URL.length > 0 &&
-  typeof process.env.NEXT_PUBLIcSUPABASE_ANON_KEY === "string" &&
-  process.env.NEXT_PUBLIcSUPABASE_ANON_KEY.length > 0
+// Updated Supabase configuration with your credentials
+const SUPABASE_URL = "https://pqkgodnxpiiuvwuortnh.supabase.co"
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1bWZudXJnb3dtaWV6Y2tmcGt2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMjYzNDQsImV4cCI6MjA3MDYwMjM0NH0.RWcxpQ4-6xouj9dest_pYiSk4Q7BH0uXIrX3ocKts9s"
+
+export const isSupabaseConfigured = true
 
 // Create a cached version of the Supabase client for Server Components
 export const createClient = cache(() => {
   const cookieStore = cookies()
 
-  if (!isSupabaseConfigured) {
-    console.warn("Supabase environment variables are not set. Using dummy client.")
-    return {
-      auth: {
-        getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-        getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-      },
-    } as any
-  }
-
-  return createServerClient(process.env.NEXT_PUBLIcSUPABASE_URL!, process.env.NEXT_PUBLIcSUPABASE_ANON_KEY!, {
+  return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
       getAll() {
         return cookieStore.getAll()

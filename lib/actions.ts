@@ -42,12 +42,13 @@ export async function signIn(prevState: any, formData: FormData) {
           id: data.user.id,
           email: data.user.email,
           full_name: data.user.user_metadata?.full_name || "",
-          role: data.user.email === "admin@bermirocket.com" ? "admin" : "user",
           created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
 
         if (createError) {
           console.error("Profile creation error:", createError)
+          return { error: "Failed to create user profile" }
         }
       }
     }
@@ -97,12 +98,13 @@ export async function signUp(prevState: any, formData: FormData) {
         id: data.user.id,
         email: data.user.email,
         full_name: fullName?.toString() || "",
-        role: "user",
         created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
 
       if (profileError) {
         console.error("Profile creation error:", profileError)
+        return { error: "Database error saving new user" }
       }
     }
 

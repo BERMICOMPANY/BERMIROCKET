@@ -148,6 +148,18 @@ export default function HomePage() {
     }
   }
 
+  const handleProfileUpdate = async () => {
+    try {
+      const updatedProfile = await getProfile()
+      setProfile(updatedProfile)
+      if (user?.id) {
+        await loadUserStats(user.id)
+      }
+    } catch (error) {
+      console.error("Error refreshing profile:", error)
+    }
+  }
+
   if (isLoading) {
     return <SplashScreen onComplete={() => setIsLoading(false)} />
   }
@@ -434,7 +446,7 @@ export default function HomePage() {
         <h1 className="text-2xl font-bold mb-2">Mission Settings</h1>
         <p className="text-muted-foreground">Customize your profile and preferences</p>
       </div>
-      <ProfileSettings initialProfile={profile} />
+      <ProfileSettings initialProfile={profile} onProfileUpdate={handleProfileUpdate} />
     </div>
   )
 

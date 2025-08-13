@@ -40,10 +40,18 @@ function SubmitButton() {
 
 interface ProfileSettingsProps {
   initialProfile?: any
+  onProfileUpdate?: () => void // Added callback for profile updates
 }
 
-export function ProfileSettings({ initialProfile }: ProfileSettingsProps) {
-  const [state, formAction] = useActionState(updateProfile, null)
+export function ProfileSettings({ initialProfile, onProfileUpdate }: ProfileSettingsProps) {
+  const [state, formAction] = useActionState(async (prevState: any, formData: FormData) => {
+    const result = await updateProfile(prevState, formData)
+    if (result?.success && onProfileUpdate) {
+      onProfileUpdate()
+    }
+    return result
+  }, null)
+
   const [skillInput, setSkillInput] = useState("")
   const [interestInput, setInterestInput] = useState("")
   const [skills, setSkills] = useState<string[]>(initialProfile?.skills || [])

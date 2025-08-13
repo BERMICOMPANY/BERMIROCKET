@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { createClient } from "@/lib/supabase/client"
 import {
   DollarSign,
   TrendingUp,
@@ -22,6 +23,72 @@ import {
 
 export function PESACoachDashboard() {
   const [activeTab, setActiveTab] = useState("overview")
+  const [financialData, setFinancialData] = useState({
+    totalSavings: 0,
+    monthlyIncome: 0,
+    currency: "USD",
+    goals: [],
+    transactions: [],
+    savingsGroups: [],
+  })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadFinancialData()
+  }, [])
+
+  const loadFinancialData = async () => {
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return
+
+    try {
+      // Get user profile for currency
+      const { data: profile } = await supabase.from("profiles").select("currency").eq("id", user.id).single()
+
+      // Get transactions
+      const { data: transactions } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(10)
+
+      // Get financial goals
+      const { data: goals } = await supabase
+        .from("financial_goals")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+
+      // Get savings groups
+      const { data: savingsGroups } = await supabase
+        .from("savings_groups")
+        .select("*, user_savings_groups!inner(*)")
+        .eq("user_savings_groups.user_id", user.id)
+
+      // Calculate totals
+      const income = transactions?.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0) || 0
+      const expenses = transactions?.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0) || 0
+      const savings = income - expenses
+
+      setFinancialData({
+        totalSavings: savings,
+        monthlyIncome: income,
+        currency: profile?.currency || "USD",
+        goals: goals || [],
+        transactions: transactions || [],
+        savingsGroups: savingsGroups || [],
+      })
+    } catch (error) {
+      console.error("Error loading financial data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const renderOverview = () => (
     <div className="space-y-6">
@@ -33,8 +100,12 @@ export function PESACoachDashboard() {
               <Wallet className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium">Total Savings</span>
             </div>
-            <p className="text-2xl font-bold text-primary">$1,250</p>
-            <p className="text-xs text-muted-foreground">+$150 this month</p>
+            <p className="text-2xl font-bold text-primary">
+              {financialData.currency} {financialData.totalSavings}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {financialData.totalSavings > 0 ? "Growing steadily" : "Start saving today"}
+            </p>
           </CardContent>
         </Card>
 
@@ -44,8 +115,12 @@ export function PESACoachDashboard() {
               <TrendingUp className="h-4 w-4 text-accent" />
               <span className="text-sm font-medium">Monthly Income</span>
             </div>
-            <p className="text-2xl font-bold text-accent">$800</p>
-            <p className="text-xs text-muted-foreground">From 3 sources</p>
+            <p className="text-2xl font-bold text-accent">
+              {financialData.currency} {financialData.monthlyIncome}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              From {financialData.transactions.filter((t) => t.type === "income").length} sources
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -59,23 +134,27 @@ export function PESACoachDashboard() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">Business Launch Fund</span>
-              <span className="text-sm text-muted-foreground">$1,250 / $2,000</span>
-            </div>
-            <Progress value={62.5} className="h-2" />
-            <p className="text-xs text-muted-foreground">$750 to go • Target: Dec 2024</p>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">Emergency Fund</span>
-              <span className="text-sm text-muted-foreground">$300 / $500</span>
-            </div>
-            <Progress value={60} className="h-2" />
-            <p className="text-xs text-muted-foreground">$200 to go • Target: Nov 2024</p>
-          </div>
+          {financialData.goals.length > 0 ? (
+            financialData.goals.map((goal: any) => (
+              <div key={goal.id} className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">{goal.title}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {financialData.currency} {goal.current_amount || 0} / {goal.target_amount}
+                  </span>
+                </div>
+                <Progress value={((goal.current_amount || 0) / goal.target_amount) * 100} className="h-2" />
+                <p className="text-xs text-muted-foreground">
+                  {financialData.currency} {goal.target_amount - (goal.current_amount || 0)} to go • Target:{" "}
+                  {new Date(goal.target_date).toLocaleDateString()}
+                </p>
+              </div>
+            ))
+          ) : (
+            <p className="text-muted-foreground text-center py-4">
+              No active goals. Set your first savings goal to get started!
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -85,44 +164,37 @@ export function PESACoachDashboard() {
           <CardTitle>Recent Activity</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                <ArrowUpRight className="h-4 w-4 text-green-600" />
+          {financialData.transactions.length > 0 ? (
+            financialData.transactions.slice(0, 5).map((transaction: any) => (
+              <div key={transaction.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      transaction.type === "income" ? "bg-green-100" : "bg-red-100"
+                    }`}
+                  >
+                    {transaction.type === "income" ? (
+                      <ArrowUpRight className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <ArrowDownRight className="h-4 w-4 text-red-600" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium">{transaction.description}</p>
+                    <p className="text-sm text-muted-foreground">{transaction.category}</p>
+                  </div>
+                </div>
+                <span className={`font-medium ${transaction.type === "income" ? "text-green-600" : "text-red-600"}`}>
+                  {transaction.type === "income" ? "+" : "-"}
+                  {financialData.currency} {transaction.amount}
+                </span>
               </div>
-              <div>
-                <p className="font-medium">Savings Group Deposit</p>
-                <p className="text-sm text-muted-foreground">Tech Entrepreneurs Circle</p>
-              </div>
-            </div>
-            <span className="font-medium text-green-600">+$50</span>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                <ArrowDownRight className="h-4 w-4 text-red-600" />
-              </div>
-              <div>
-                <p className="font-medium">Business Supplies</p>
-                <p className="text-sm text-muted-foreground">Office materials</p>
-              </div>
-            </div>
-            <span className="font-medium text-red-600">-$25</span>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                <ArrowUpRight className="h-4 w-4 text-green-600" />
-              </div>
-              <div>
-                <p className="font-medium">Freelance Payment</p>
-                <p className="text-sm text-muted-foreground">Web design project</p>
-              </div>
-            </div>
-            <span className="font-medium text-green-600">+$200</span>
-          </div>
+            ))
+          ) : (
+            <p className="text-muted-foreground text-center py-4">
+              No transactions yet. Start tracking your income and expenses!
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -136,8 +208,9 @@ export function PESACoachDashboard() {
         </CardHeader>
         <CardContent>
           <p className="text-sm mb-3">
-            Great progress! You're saving 18% of your income. Consider increasing your emergency fund contribution by
-            $25/month to reach your goal faster.
+            {financialData.totalSavings > 0
+              ? `Great progress! You're building your savings. Consider setting up automatic transfers to reach your goals faster.`
+              : `Ready to start your financial journey? Begin by tracking your income and setting your first savings goal.`}
           </p>
           <Button size="sm" variant="outline">
             Get Personalized Advice
@@ -157,63 +230,50 @@ export function PESACoachDashboard() {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Tech Entrepreneurs Circle</span>
-            <Badge variant="secondary">Active</Badge>
-          </CardTitle>
-          <CardDescription>12 members • Weekly contributions</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-muted-foreground">My Contribution</p>
-              <p className="font-semibold">$50/week</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Total Pool</p>
-              <p className="font-semibold">$2,400</p>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Next Payout</span>
-              <span>Week 8 of 12</span>
-            </div>
-            <Progress value={67} className="h-2" />
-          </div>
-          <Button size="sm" className="w-full">
-            Make This Week's Contribution
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Young Innovators Fund</span>
-            <Badge variant="outline">Pending</Badge>
-          </CardTitle>
-          <CardDescription>8 members • Monthly contributions</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-muted-foreground">My Contribution</p>
-              <p className="font-semibold">$100/month</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Total Pool</p>
-              <p className="font-semibold">$800</p>
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground">Waiting for 4 more members to start the cycle</p>
-          <Button size="sm" variant="outline" className="w-full bg-transparent">
-            Invite Friends
-          </Button>
-        </CardContent>
-      </Card>
+      {financialData.savingsGroups.length > 0 ? (
+        financialData.savingsGroups.map((group: any) => (
+          <Card key={group.id}>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>{group.name}</span>
+                <Badge variant="secondary">{group.status}</Badge>
+              </CardTitle>
+              <CardDescription>
+                {group.member_count} members • {group.contribution_frequency} contributions
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">My Contribution</p>
+                  <p className="font-semibold">
+                    {financialData.currency} {group.contribution_amount}/{group.contribution_frequency}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Total Pool</p>
+                  <p className="font-semibold">
+                    {financialData.currency} {group.total_pool || 0}
+                  </p>
+                </div>
+              </div>
+              <Button size="sm" className="w-full">
+                Make Contribution
+              </Button>
+            </CardContent>
+          </Card>
+        ))
+      ) : (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-muted-foreground mb-4">You haven't joined any savings groups yet.</p>
+            <Button>
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Find Groups to Join
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 
@@ -227,40 +287,6 @@ export function PESACoachDashboard() {
         </Button>
       </div>
 
-      {/* Monthly Budget Overview */}
-      <Card>
-        <CardHeader>
-          <CardTitle>October Budget</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Business Expenses</span>
-              <div className="text-right">
-                <p className="text-sm font-medium">$150 / $200</p>
-                <Progress value={75} className="h-1 w-16" />
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Personal</span>
-              <div className="text-right">
-                <p className="text-sm font-medium">$300 / $400</p>
-                <Progress value={75} className="h-1 w-16" />
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Savings</span>
-              <div className="text-right">
-                <p className="text-sm font-medium">$200 / $200</p>
-                <Progress value={100} className="h-1 w-16" />
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Quick Add Expense */}
       <Card>
         <CardHeader>
@@ -269,8 +295,8 @@ export function PESACoachDashboard() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="amount">Amount</Label>
-              <Input id="amount" placeholder="$0.00" />
+              <Label htmlFor="amount">Amount ({financialData.currency})</Label>
+              <Input id="amount" placeholder="0.00" />
             </div>
             <div>
               <Label htmlFor="category">Category</Label>
@@ -345,6 +371,17 @@ export function PESACoachDashboard() {
       </div>
     </div>
   )
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading your financial data...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="pb-20">

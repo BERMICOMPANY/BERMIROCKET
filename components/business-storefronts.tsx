@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,12 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Progress } from "@/components/ui/progress"
+import { createClient } from "@/lib/supabase/client"
 import {
   Store,
   Package,
   ShoppingCart,
-  Users,
   TrendingUp,
   Plus,
   Edit,
@@ -30,73 +29,77 @@ import {
 
 export function BusinessStorefronts() {
   const [activeTab, setActiveTab] = useState("dashboard")
+  const [businessData, setBusinessData] = useState({
+    businesses: [],
+    products: [],
+    orders: [],
+    currency: "USD",
+    stats: {
+      totalRevenue: 0,
+      totalOrders: 0,
+      activeProducts: 0,
+      customerRating: 0,
+    },
+  })
+  const [loading, setLoading] = useState(true)
 
-  const businessStats = {
-    totalRevenue: 2450,
-    totalOrders: 23,
-    activeProducts: 8,
-    customerRating: 4.8,
+  useEffect(() => {
+    loadBusinessData()
+  }, [])
+
+  const loadBusinessData = async () => {
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return
+
+    try {
+      // Get user profile for currency
+      const { data: profile } = await supabase.from("profiles").select("currency").eq("id", user.id).single()
+
+      // Get user businesses
+      const { data: businesses } = await supabase.from("businesses").select("*").eq("user_id", user.id)
+
+      // Get products
+      const { data: products } = await supabase
+        .from("products")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+
+      // Get orders
+      const { data: orders } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("seller_id", user.id)
+        .order("created_at", { ascending: false })
+
+      // Calculate stats
+      const totalRevenue = orders?.reduce((sum, order) => sum + order.total_amount, 0) || 0
+      const totalOrders = orders?.length || 0
+      const activeProducts = products?.filter((p) => p.status === "active").length || 0
+      const avgRating = products?.reduce((sum, p) => sum + (p.rating || 0), 0) / (products?.length || 1) || 0
+
+      setBusinessData({
+        businesses: businesses || [],
+        products: products || [],
+        orders: orders || [],
+        currency: profile?.currency || "USD",
+        stats: {
+          totalRevenue,
+          totalOrders,
+          activeProducts,
+          customerRating: Math.round(avgRating * 10) / 10,
+        },
+      })
+    } catch (error) {
+      console.error("Error loading business data:", error)
+    } finally {
+      setLoading(false)
+    }
   }
-
-  const recentOrders = [
-    {
-      id: "ORD-001",
-      customer: "Sarah M.",
-      product: "Custom Logo Design",
-      amount: 150,
-      status: "completed",
-      date: "Oct 20, 2024",
-    },
-    {
-      id: "ORD-002",
-      customer: "John K.",
-      product: "Website Development",
-      amount: 800,
-      status: "in-progress",
-      date: "Oct 18, 2024",
-    },
-    {
-      id: "ORD-003",
-      customer: "Mary L.",
-      product: "Social Media Package",
-      amount: 200,
-      status: "pending",
-      date: "Oct 17, 2024",
-    },
-  ]
-
-  const products = [
-    {
-      id: 1,
-      name: "Custom Logo Design",
-      price: 150,
-      category: "Design",
-      status: "active",
-      orders: 12,
-      rating: 4.9,
-      image: "/generic-logo-design.png",
-    },
-    {
-      id: 2,
-      name: "Website Development",
-      price: 800,
-      category: "Development",
-      status: "active",
-      orders: 5,
-      rating: 5.0,
-      image: "/website-development.png",
-    },
-    {
-      id: 3,
-      name: "Social Media Package",
-      price: 200,
-      category: "Marketing",
-      status: "active",
-      orders: 8,
-      rating: 4.7,
-      image: "/social-media-marketing.png",
-    },
-  ]
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -134,8 +137,12 @@ export function BusinessStorefronts() {
               <DollarSign className="h-4 w-4 text-green-600" />
               <span className="text-sm font-medium">Total Revenue</span>
             </div>
-            <p className="text-2xl font-bold text-green-600">${businessStats.totalRevenue}</p>
-            <p className="text-xs text-muted-foreground">+12% this month</p>
+            <p className="text-2xl font-bold text-green-600">
+              {businessData.currency} {businessData.stats.totalRevenue}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {businessData.stats.totalRevenue > 0 ? "Growing business" : "Start selling"}
+            </p>
           </CardContent>
         </Card>
 
@@ -145,8 +152,10 @@ export function BusinessStorefronts() {
               <ShoppingCart className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium">Total Orders</span>
             </div>
-            <p className="text-2xl font-bold text-primary">{businessStats.totalOrders}</p>
-            <p className="text-xs text-muted-foreground">+3 this week</p>
+            <p className="text-2xl font-bold text-primary">{businessData.stats.totalOrders}</p>
+            <p className="text-xs text-muted-foreground">
+              {businessData.stats.totalOrders > 0 ? "Orders received" : "First order coming"}
+            </p>
           </CardContent>
         </Card>
 
@@ -156,8 +165,10 @@ export function BusinessStorefronts() {
               <Package className="h-4 w-4 text-accent" />
               <span className="text-sm font-medium">Active Products</span>
             </div>
-            <p className="text-2xl font-bold text-accent">{businessStats.activeProducts}</p>
-            <p className="text-xs text-muted-foreground">2 pending review</p>
+            <p className="text-2xl font-bold text-accent">{businessData.stats.activeProducts}</p>
+            <p className="text-xs text-muted-foreground">
+              {businessData.products.length - businessData.stats.activeProducts} pending review
+            </p>
           </CardContent>
         </Card>
 
@@ -167,8 +178,8 @@ export function BusinessStorefronts() {
               <Star className="h-4 w-4 text-yellow-500" />
               <span className="text-sm font-medium">Rating</span>
             </div>
-            <p className="text-2xl font-bold text-yellow-600">{businessStats.customerRating}</p>
-            <p className="text-xs text-muted-foreground">From 23 reviews</p>
+            <p className="text-2xl font-bold text-yellow-600">{businessData.stats.customerRating || "N/A"}</p>
+            <p className="text-xs text-muted-foreground">From {businessData.stats.totalOrders} reviews</p>
           </CardContent>
         </Card>
       </div>
@@ -182,34 +193,44 @@ export function BusinessStorefronts() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {recentOrders.map((order) => (
-            <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center gap-3">
-                {getStatusIcon(order.status)}
-                <div>
-                  <p className="font-medium">{order.product}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {order.customer} • {order.date}
+          {businessData.orders.length > 0 ? (
+            businessData.orders.slice(0, 5).map((order: any) => (
+              <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  {getStatusIcon(order.status)}
+                  <div>
+                    <p className="font-medium">{order.product_name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Order #{order.id.slice(0, 8)} • {new Date(order.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold">
+                    {businessData.currency} {order.total_amount}
                   </p>
+                  <Badge className={getStatusColor(order.status)} variant="secondary">
+                    {order.status}
+                  </Badge>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="font-semibold">${order.amount}</p>
-                <Badge className={getStatusColor(order.status)} variant="secondary">
-                  {order.status}
-                </Badge>
-              </div>
-            </div>
-          ))}
-          <Button variant="outline" className="w-full bg-transparent">
-            View All Orders
-          </Button>
+            ))
+          ) : (
+            <p className="text-muted-foreground text-center py-4">
+              No orders yet. Start by adding products to your storefront!
+            </p>
+          )}
+          {businessData.orders.length > 5 && (
+            <Button variant="outline" className="w-full bg-transparent">
+              View All Orders
+            </Button>
+          )}
         </CardContent>
       </Card>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-4">
-        <Button className="h-16 flex-col gap-2">
+        <Button className="h-16 flex-col gap-2" onClick={() => setActiveTab("products")}>
           <Plus className="h-5 w-5" />
           Add Product
         </Button>
@@ -232,46 +253,61 @@ export function BusinessStorefronts() {
       </div>
 
       <div className="space-y-4">
-        {products.map((product) => (
-          <Card key={product.id}>
-            <CardContent className="p-4">
-              <div className="flex gap-4">
-                <img
-                  src={product.image || "/placeholder.svg"}
-                  alt={product.name}
-                  className="w-16 h-16 rounded-lg object-cover"
-                />
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="font-medium">{product.name}</h4>
-                      <p className="text-sm text-muted-foreground">{product.category}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="font-semibold text-green-600">${product.price}</span>
-                      <span className="text-muted-foreground">{product.orders} orders</span>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-3 w-3 text-yellow-500 fill-current" />
-                        <span>{product.rating}</span>
+        {businessData.products.length > 0 ? (
+          businessData.products.map((product: any) => (
+            <Card key={product.id}>
+              <CardContent className="p-4">
+                <div className="flex gap-4">
+                  <img
+                    src={product.image_url || "/placeholder.svg"}
+                    alt={product.name}
+                    className="w-16 h-16 rounded-lg object-cover"
+                  />
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="font-medium">{product.name}</h4>
+                        <p className="text-sm text-muted-foreground">{product.category}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="outline">
+                          <Eye className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <Badge variant="secondary">{product.status}</Badge>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4 text-sm">
+                        <span className="font-semibold text-green-600">
+                          {businessData.currency} {product.price}
+                        </span>
+                        <span className="text-muted-foreground">{product.orders_count || 0} orders</span>
+                        <div className="flex items-center gap-1">
+                          <Star className="h-3 w-3 text-yellow-500 fill-current" />
+                          <span>{product.rating || "N/A"}</span>
+                        </div>
+                      </div>
+                      <Badge variant="secondary">{product.status}</Badge>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground mb-4">You haven't added any products yet.</p>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Your First Product
+              </Button>
             </CardContent>
           </Card>
-        ))}
+        )}
       </div>
 
       {/* Add New Product Form */}
@@ -286,7 +322,7 @@ export function BusinessStorefronts() {
               <Input id="product-name" placeholder="Enter product name" />
             </div>
             <div>
-              <Label htmlFor="price">Price ($)</Label>
+              <Label htmlFor="price">Price ({businessData.currency})</Label>
               <Input id="price" type="number" placeholder="0.00" />
             </div>
           </div>
@@ -311,40 +347,56 @@ export function BusinessStorefronts() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Order Management</h3>
-        <Badge variant="secondary">{recentOrders.length} Active Orders</Badge>
+        <Badge variant="secondary">{businessData.orders.length} Total Orders</Badge>
       </div>
 
       <div className="space-y-4">
-        {recentOrders.map((order) => (
-          <Card key={order.id}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(order.status)}
-                  <span className="font-medium">{order.id}</span>
+        {businessData.orders.length > 0 ? (
+          businessData.orders.map((order: any) => (
+            <Card key={order.id}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {getStatusIcon(order.status)}
+                    <span className="font-medium">#{order.id.slice(0, 8)}</span>
+                  </div>
+                  <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
                 </div>
-                <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h4 className="font-medium">{order.product}</h4>
-                <p className="text-sm text-muted-foreground">Customer: {order.customer}</p>
-                <p className="text-sm text-muted-foreground">Order Date: {order.date}</p>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-green-600">${order.amount}</span>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline">
-                    <MessageCircle className="h-4 w-4 mr-2" />
-                    Message
-                  </Button>
-                  <Button size="sm">Update Status</Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <h4 className="font-medium">{order.product_name}</h4>
+                  <p className="text-sm text-muted-foreground">Quantity: {order.quantity}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Order Date: {new Date(order.created_at).toLocaleDateString()}
+                  </p>
                 </div>
-              </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-green-600">
+                    {businessData.currency} {order.total_amount}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline">
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Message
+                    </Button>
+                    <Button size="sm">Update Status</Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground mb-4">No orders yet.</p>
+              <p className="text-sm text-muted-foreground">
+                Orders will appear here once customers start purchasing your products.
+              </p>
             </CardContent>
           </Card>
-        ))}
+        )}
       </div>
     </div>
   )
@@ -358,25 +410,31 @@ export function BusinessStorefronts() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-green-600" />
-            Revenue Trend
+            Revenue Overview
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="h-32 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg flex items-center justify-center">
-            <p className="text-muted-foreground">Revenue chart visualization</p>
+            <p className="text-muted-foreground">Revenue visualization coming soon</p>
           </div>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <p className="text-2xl font-bold text-green-600">$850</p>
-              <p className="text-sm text-muted-foreground">This Month</p>
+              <p className="text-2xl font-bold text-green-600">
+                {businessData.currency} {businessData.stats.totalRevenue}
+              </p>
+              <p className="text-sm text-muted-foreground">Total Revenue</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-blue-600">$1,200</p>
-              <p className="text-sm text-muted-foreground">Last Month</p>
+              <p className="text-2xl font-bold text-blue-600">{businessData.stats.totalOrders}</p>
+              <p className="text-sm text-muted-foreground">Total Orders</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-purple-600">+18%</p>
-              <p className="text-sm text-muted-foreground">Growth</p>
+              <p className="text-2xl font-bold text-purple-600">
+                {businessData.stats.totalOrders > 0
+                  ? `${businessData.currency} ${Math.round(businessData.stats.totalRevenue / businessData.stats.totalOrders)}`
+                  : "N/A"}
+              </p>
+              <p className="text-sm text-muted-foreground">Avg Order Value</p>
             </div>
           </div>
         </CardContent>
@@ -391,57 +449,41 @@ export function BusinessStorefronts() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {products.slice(0, 3).map((product, index) => (
-            <div key={product.id} className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-bold text-primary">#{index + 1}</span>
+          {businessData.products.length > 0 ? (
+            businessData.products.slice(0, 3).map((product: any, index: number) => (
+              <div key={product.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-bold text-primary">#{index + 1}</span>
+                  </div>
+                  <div>
+                    <p className="font-medium">{product.name}</p>
+                    <p className="text-sm text-muted-foreground">{product.orders_count || 0} orders</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium">{product.name}</p>
-                  <p className="text-sm text-muted-foreground">{product.orders} orders</p>
-                </div>
+                <span className="font-semibold text-green-600">
+                  {businessData.currency} {(product.orders_count || 0) * product.price}
+                </span>
               </div>
-              <span className="font-semibold text-green-600">${product.price * product.orders}</span>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Customer Insights */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-accent" />
-            Customer Insights
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Customer Satisfaction</span>
-              <span className="text-sm font-medium">96%</span>
-            </div>
-            <Progress value={96} className="h-2" />
-          </div>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Repeat Customers</span>
-              <span className="text-sm font-medium">68%</span>
-            </div>
-            <Progress value={68} className="h-2" />
-          </div>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Response Time</span>
-              <span className="text-sm font-medium">2.3 hours avg</span>
-            </div>
-            <Progress value={85} className="h-2" />
-          </div>
+            ))
+          ) : (
+            <p className="text-muted-foreground text-center py-4">Add products to see performance analytics</p>
+          )}
         </CardContent>
       </Card>
     </div>
   )
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading your business data...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="pb-20">

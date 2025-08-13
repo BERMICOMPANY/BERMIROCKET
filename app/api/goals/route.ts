@@ -1,0 +1,71 @@
+import { createClient } from "@/lib/supabase/server"
+import { type NextRequest, NextResponse } from "next/server"
+
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { data: goals, error } = await supabase
+      .from("financial_goals")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ goals })
+  } catch (error) {
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { title, target_amount, target_currency, due_date } = body
+
+    if (!title || !target_amount) {
+      return NextResponse.json({ error: "Title and target amount are required" }, { status: 400 })
+    }
+
+    const { data: goal, error } = await supabase
+      .from("financial_goals")
+      .insert({
+        user_id: user.id,
+        title,
+        target_amount: Number.parseFloat(target_amount),
+        target_currency: target_currency || "USD",
+        due_date,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ goal }, { status: 201 })
+  } catch (error) {
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
